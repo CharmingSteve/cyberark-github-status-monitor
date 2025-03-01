@@ -1,13 +1,31 @@
+# StatusCake monitoring (backup system)
+
+# StatusCake Contact Group for alerts
+resource "statuscake_contact_group" "slack_alerts" {
+  name = "github-status-alerts"
+  
+  # Email integration
+  email_addresses = var.alert_email_addresses
+  
+  # Slack integration via webhook
+  integrations = {
+    slack = {
+      url = var.slack_webhook_url
+    }
+  }
+}
+
 # StatusCake Uptime Check for GitHub Status
 resource "statuscake_uptime_check" "github_status" {
-  name           = "GitHub Status Monitor"
-  check_rate     = 300  # 5 minutes
-  confirmation   = 2    # Require confirmation from multiple locations
-  regions        = ["US", "EU"]  # Monitor from multiple regions
+  name           = "github-status-check"
+  website_url    = "https://www.githubstatus.com"
+  check_rate     = 300 # 5 minutes
   contact_groups = [statuscake_contact_group.slack_alerts.id]
-  test_type      = "HTTP"
-  website_url    = "https://www.githubstatus.com/api/v2/summary.json"
-
+  regions        = ["US", "EU"]
+  
+  confirmation   = 2
+  trigger_rate   = 5
+  
   http_check {
     follow_redirects = true
     validate_ssl     = true
