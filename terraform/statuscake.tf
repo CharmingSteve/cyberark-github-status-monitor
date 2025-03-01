@@ -4,15 +4,15 @@
 resource "statuscake_contact_group" "slack_alerts" {
   name = "github-status-alerts"
   
-  # Email integration
-  email_addresses = var.alert_email_addresses
-  
   # Slack integration via webhook
   integrations = {
     slack = {
       url = var.slack_webhook_url
     }
   }
+  
+  # Optional: Include email addresses if needed as backup
+  #email_addresses = var.alert_email_addresses
 }
 
 # StatusCake Uptime Check for GitHub Status
