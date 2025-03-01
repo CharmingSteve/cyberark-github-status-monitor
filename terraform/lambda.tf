@@ -1,3 +1,22 @@
+# Source code archives
+data "archive_file" "github_monitor_zip" {
+  type        = "zip"
+  output_path = "${path.module}/files/github_monitor.zip"
+  source_dir  = "${path.module}/src/github_monitor"
+}
+
+data "archive_file" "acknowledgment_handler_zip" {
+  type        = "zip"
+  output_path = "${path.module}/files/acknowledgment_handler.zip"
+  source_dir  = "${path.module}/src/acknowledgment_handler"
+}
+
+data "archive_file" "escalation_handler_zip" {
+  type        = "zip"
+  output_path = "${path.module}/files/escalation_handler.zip"
+  source_dir  = "${path.module}/src/escalation_handler"
+}
+
 # Lambda functions - GitHub Monitor
 resource "aws_lambda_function" "github_monitor" {
   function_name    = "github-status-monitor"
@@ -8,31 +27,28 @@ resource "aws_lambda_function" "github_monitor" {
   timeout          = 30
   memory_size      = 128
   role             = aws_iam_role.lambda_execution_role.arn
-  
   environment {
     variables = local.lambda_environment_vars_github_monitor
   }
-  
   tags = local.common_tags
 }
 
 resource "aws_lambda_function" "github_monitor_secondary" {
-  provider        = aws.secondary
-  function_name   = "github-status-monitor"
-  filename        = data.archive_file.github_monitor_zip.output_path
+  provider         = aws.secondary
+  function_name    = "github-status-monitor"
+  filename         = data.archive_file.github_monitor_zip.output_path
   source_code_hash = data.archive_file.github_monitor_zip.output_base64sha256
-  handler         = "main.lambda_handler"
-  runtime         = "python3.9"
-  timeout         = 30
-  memory_size     = 128
-  role            = aws_iam_role.lambda_execution_role_secondary.arn
-  
+  handler          = "main.lambda_handler"
+  runtime          = "python3.9"
+  timeout          = 30
+  memory_size      = 128
+  role             = aws_iam_role.lambda_execution_role_secondary.arn
   environment {
     variables = local.lambda_environment_vars_github_monitor
   }
-  
   tags = local.common_tags
 }
+
 # Lambda functions - Acknowledgment Handler
 resource "aws_lambda_function" "acknowledgment_handler" {
   function_name    = "github-acknowledgment-handler"
@@ -43,13 +59,12 @@ resource "aws_lambda_function" "acknowledgment_handler" {
   timeout          = 30
   memory_size      = 128
   role             = aws_iam_role.lambda_execution_role.arn
-  
   environment {
     variables = local.lambda_environment_vars_acknowledgment_handler
   }
-  
   tags = local.common_tags
 }
+
 # Lambda functions - Escalation Handler
 resource "aws_lambda_function" "escalation_handler" {
   function_name    = "github-escalation-handler"
@@ -60,11 +75,9 @@ resource "aws_lambda_function" "escalation_handler" {
   timeout          = 30
   memory_size      = 128
   role             = aws_iam_role.lambda_execution_role.arn
-  
   environment {
     variables = local.lambda_environment_vars_escalation_handler
   }
-  
   tags = local.common_tags
 }
 
