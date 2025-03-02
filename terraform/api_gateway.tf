@@ -39,10 +39,16 @@ resource "aws_apigatewayv2_stage" "lambda" {
 }
 
 # API Gateway Route
+variable "handler_function_name" {
+  type        = string
+  description = "Name of the Lambda function to handle API Gateway requests"
+  default     = "acknowledgment_handler"
+}
+
 resource "aws_apigatewayv2_integration" "acknowledgment_handler" {
   api_id                 = aws_apigatewayv2_api.lambda.id
   integration_type       = "AWS_PROXY"
-  integration_uri        = aws_lambda_function.acknowledgment_handler.invoke_arn
+  integration_uri        = aws_lambda_function[var.handler_function_name].invoke_arn
   integration_method     = "POST"
   payload_format_version = "2.0"
 }
