@@ -13,7 +13,15 @@ resource "aws_s3_bucket_versioning" "heartbeat" {
     status = "Enabled"
   }
 }
+# Ensure S3 Block Public Access is disabled to allow public policies
+resource "aws_s3_bucket_public_access_block" "heartbeat" {
+  bucket = aws_s3_bucket.heartbeat.id
 
+  block_public_acls       = false
+  block_public_policy     = false
+  ignore_public_acls      = false
+  restrict_public_buckets = false
+}
 # Enable default encryption
 resource "aws_s3_bucket_server_side_encryption_configuration" "heartbeat" {
   bucket = aws_s3_bucket.heartbeat.id

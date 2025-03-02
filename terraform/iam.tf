@@ -1,41 +1,20 @@
-# IAM role for Lambda execution in primary region
+# Single IAM role for Lambda execution across all regions
 resource "aws_iam_role" "lambda_execution_role" {
   name = "github-monitor-lambda-role"
-  
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Action = "sts:AssumeRole"
-        Effect = "Allow"
-        Principal = {
-          Service = "lambda.amazonaws.com"
-        }
-      }
-    ]
-  })
-  
-  tags = local.common_tags
-}
 
-# IAM role for Lambda execution in secondary region
-resource "aws_iam_role" "lambda_execution_role_secondary" {
-  provider = aws.secondary
-  name     = "github-monitor-lambda-role"
-  
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
       {
-        Action = "sts:AssumeRole"
         Effect = "Allow"
         Principal = {
           Service = "lambda.amazonaws.com"
         }
+        Action = "sts:AssumeRole"
       }
     ]
   })
-  
+
   tags = local.common_tags
 }
 
@@ -43,7 +22,7 @@ resource "aws_iam_role" "lambda_execution_role_secondary" {
 resource "aws_iam_policy" "lambda_dynamodb_policy" {
   name        = "github-monitor-lambda-dynamodb-policy"
   description = "Policy for Lambda to access DynamoDB"
-  
+
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
@@ -71,7 +50,7 @@ resource "aws_iam_policy" "lambda_dynamodb_policy" {
 resource "aws_iam_policy" "lambda_s3_policy" {
   name        = "github-monitor-lambda-s3-policy"
   description = "Policy for Lambda to access S3 heartbeat bucket"
-  
+
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
@@ -95,7 +74,7 @@ resource "aws_iam_policy" "lambda_s3_policy" {
 resource "aws_iam_policy" "lambda_logging_policy" {
   name        = "github-monitor-lambda-logging-policy"
   description = "Policy for Lambda to write logs to CloudWatch"
-  
+
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
@@ -112,7 +91,7 @@ resource "aws_iam_policy" "lambda_logging_policy" {
   })
 }
 
-# Attach policies to primary region role
+# Attach policies to the single IAM role
 resource "aws_iam_role_policy_attachment" "lambda_dynamodb_attach" {
   role       = aws_iam_role.lambda_execution_role.name
   policy_arn = aws_iam_policy.lambda_dynamodb_policy.arn
@@ -125,24 +104,5 @@ resource "aws_iam_role_policy_attachment" "lambda_s3_attach" {
 
 resource "aws_iam_role_policy_attachment" "lambda_logging_attach" {
   role       = aws_iam_role.lambda_execution_role.name
-  policy_arn = aws_iam_policy.lambda_logging_policy.arn
-}
-
-# Attach policies to secondary region role
-resource "aws_iam_role_policy_attachment" "lambda_dynamodb_attach_secondary" {
-  provider   = aws.secondary
-  role       = aws_iam_role.lambda_execution_role_secondary.name
-  policy_arn = aws_iam_policy.lambda_dynamodb_policy.arn
-}
-
-resource "aws_iam_role_policy_attachment" "lambda_s3_attach_secondary" {
-  provider   = aws.secondary
-  role       = aws_iam_role.lambda_execution_role_secondary.name
-  policy_arn = aws_iam_policy.lambda_s3_policy.arn
-}
-
-resource "aws_iam_role_policy_attachment" "lambda_logging_attach_secondary" {
-  provider   = aws.secondary
-  role       = aws_iam_role.lambda_execution_role_secondary.name
   policy_arn = aws_iam_policy.lambda_logging_policy.arn
 }
