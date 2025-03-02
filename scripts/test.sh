@@ -9,7 +9,6 @@ export AWS_REGION="us-east-1"
 export DYNAMODB_TABLE="github-status-monitor"
 export SLACK_WEBHOOK_URL="your_slack_webhook_url"
 export SLACK_API_TOKEN="your_slack_api_token"
-export STATUSCAKE_API_KEY="your_statuscake_api_key"
 export HEARTBEAT_BUCKET="github-monitor-heartbeat"
 export HEARTBEAT_FILE="lambda-heartbeat.html"
 

@@ -16,7 +16,7 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v2
         with:
-          terraform_version: 1.11.0
+          terraform_version: 1..0
           cli_config_migrate: true
 
       - name: Verify Terraform Version
@@ -46,7 +46,6 @@ jobs:
           terraform plan \
             -var="slack_api_token=${{ secrets.SLACK_API_TOKEN }}" \
             -var="slack_webhook_url=${{ secrets.SLACK_WEBHOOK_URL }}" \
-            -var="statuscake_api_key=${{ secrets.STATUSCAKE_API_KEY }}" \
             -out=tfplan
           echo "::set-output name=stdout::$($(cat tfplan))"
 
@@ -62,5 +61,4 @@ jobs:
           cd terraform
           terraform apply -auto-approve tfplan \
             -var="slack_api_token=${{ secrets.SLACK_API_TOKEN }}" \
-            -var="slack_webhook_url=${{ secrets.SLACK_WEBHOOK_URL }}" \
-            -var="statuscake_api_key=${{ secrets.STATUSCAKE_API_KEY }}"
+            -var="slack_webhook_url=${{ secrets.SLACK_WEBHOOK_URL }}"
