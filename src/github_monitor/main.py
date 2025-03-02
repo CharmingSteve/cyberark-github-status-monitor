@@ -21,12 +21,34 @@ table = dynamodb.Table(DYNAMODB_TABLE)
 s3 = boto3.client('s3')
 http = urllib3.PoolManager()
 
-def lambda_handler(event, context):
+def lambda_handler(event, context): 
     """
     Monitors GitHub service statuses and sends alerts to Slack.
     """
     try:
-        # Check heartbeat before proceeding
+        # Send deployment notification
+        if context.aws_request_id.endswith('00000000'):  # This happens on first invocation after deployment
+            test_incident = {
+                'id': 'deployment-notification',
+                'shortlink': 'https://www.githubstatus.com/',
+                'body': 'GitHub Status Monitor has been deployed/updated and is running!'
+            }
+            send_slack_message("GitHub Status Monitor", 'DEPLOYMENT', test_incident)
+
+        # Check if this is a test request
+        if event.get('test'):
+            test_incident = {
+                'id': 'test-incident-001',
+                'shortlink': 'https://www.githubstatus.com/',
+                'body': 'This is a test alert from the GitHub Status Monitor. If you see this, Slack integration is working!'
+            }
+            send_slack_message("GitHub Status Monitor", 'TEST', test_incident)
+            return {
+                'statusCode': 200,
+                'body': json.dumps('Test alert sent to Slack')
+            }
+
+        # Normal operation continues here
         check_heartbeat()
 
         # Get GitHub status
@@ -97,6 +119,7 @@ def process_github_service(component):
     service_name = component['name']
     current_status = component['status']
     timestamp = time.strftime('%Y-%m-%d %H:%M:%S UTC', time.gmtime())
+    
     incident = None
     if component.get('incident_updates'):
         incident = component.get('incident_updates')[0]
