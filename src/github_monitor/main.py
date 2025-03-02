@@ -26,23 +26,30 @@ def lambda_handler(event, context):
     Monitors GitHub service statuses and sends alerts to Slack.
     """
     try:
+        print(f"Lambda started with event: {event}")  # Debug print
+        print(f"SLACK_WEBHOOK_URL is set: {bool(SLACK_WEBHOOK_URL)}")  # Check if env var exists
+
         # Send deployment notification
         if context.aws_request_id.endswith('00000000'):  # This happens on first invocation after deployment
+            print("Sending deployment notification")  # Debug print
             test_incident = {
                 'id': 'deployment-notification',
                 'shortlink': 'https://www.githubstatus.com/',
                 'body': 'GitHub Status Monitor has been deployed/updated and is running!'
             }
             send_slack_message("GitHub Status Monitor", 'DEPLOYMENT', test_incident)
+            print("Deployment notification sent")  # Debug print
 
         # Check if this is a test request
         if event.get('test'):
+            print("Test mode detected, sending test message")  # Debug print
             test_incident = {
                 'id': 'test-incident-001',
                 'shortlink': 'https://www.githubstatus.com/',
                 'body': 'This is a test alert from the GitHub Status Monitor. If you see this, Slack integration is working!'
             }
             send_slack_message("GitHub Status Monitor", 'TEST', test_incident)
+            print("Test message sent")  # Debug print
             return {
                 'statusCode': 200,
                 'body': json.dumps('Test alert sent to Slack')
@@ -306,8 +313,9 @@ def send_slack_message(service_name, current_status, incident):
     Sends a message to Slack about the GitHub service status.
     """
     try:
+        print(f"Attempting to send Slack message for {service_name}")  # Debug print
         message_text = f":red_circle: *{current_status.upper()}*: {service_name} - {incident['shortlink']}\n{incident['body']}"
-
+        
         blocks = [
             {
                 "type": "section",
@@ -327,6 +335,7 @@ def send_slack_message(service_name, current_status, incident):
             "blocks": blocks
         }
 
+        print(f"Sending to Slack webhook: {message}")  # Debug print
         encoded_data = json.dumps(message).encode('utf-8')
         response = http.request(
             'POST',
@@ -334,7 +343,9 @@ def send_slack_message(service_name, current_status, incident):
             body=encoded_data,
             headers={'Content-type': 'application/json'}
         )
-        print(f"Slack notification sent: {response.status}")
+        print(f"Slack response status: {response.status}")  # Debug print
+        print(f"Slack response data: {response.data}")  # Debug print
 
     except Exception as e:
-        print(f"Error sending Slack notification: {e}")
+        print(f"Error sending Slack notification: {str(e)}")  # Detailed error
+        raise  # Re-raise to see in CloudWatch
