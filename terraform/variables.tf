@@ -1,4 +1,4 @@
-variable "primary_region" {
+variable "aws_region" {
   description = "Primary AWS region for deployment"
   type        = string
   default     = "us-east-1"
@@ -50,4 +50,16 @@ variable "heartbeat_bucket_name" {
   description = "S3 bucket name for Lambda heartbeat file"
   type        = string
   default     = "github-monitor-heartbeat"
+}
+
+variable "primary_region" {
+  description = "Set to true if deploying in the primary region, false for secondary"
+  type        = bool
+  default     = true
+}
+
+variable "common_tags" {
+  description = "Common tags for all resources"
+  type        = map(string)
+  default     = {}
 }

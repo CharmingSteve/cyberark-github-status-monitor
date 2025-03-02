@@ -99,13 +99,6 @@ resource "aws_apigatewayv2_integration" "acknowledgment_handler_integration" {
   payload_format_version  = "2.0"
 }
 
-resource "aws_apigatewayv2_route" "acknowledgment_handler_route" {
-  count     = var.primary_region ? 1 : 0
-  api_id    = aws_apigatewayv2_api.lambda.id
-  route_key = "POST /acknowledge"
-
-  target = "integrations/${aws_apigatewayv2_integration.acknowledgment_handler_integration[0].id}"
-}
 
 resource "aws_lambda_permission" "api_gw_acknowledgment_handler" {
   count         = var.primary_region ? 1 : 0

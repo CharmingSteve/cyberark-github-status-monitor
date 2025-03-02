@@ -10,7 +10,7 @@ terraform {
 
 # Primary region provider
 provider "aws" {
-  region = var.primary_region
+  region = var.aws_region
 }
 
 # Secondary region provider for high availability
