@@ -10,7 +10,7 @@ output "secondary_lambda_function_name" {
 
 output "acknowledgment_api_gateway_url" {
   description = "URL for the acknowledgment API Gateway"
-  value       = "${aws_apigatewayv2_stage.lambda.invoke_url}/acknowledge"
+  value       = "${aws_api_gateway_stage.prod.invoke_url}/acknowledge"
 }
 
 output "dynamodb_table_name" {

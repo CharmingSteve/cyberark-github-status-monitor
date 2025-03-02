@@ -64,16 +64,6 @@ variable "common_tags" {
   default     = {}
 }
 
-variable "primary_region" {
-  type    = string
-  default = "us-east-1"
-}
-
-variable "secondary_region" {
-  type    = string
-  default = "us-west-2"
-}
-
 variable "failover_threshold" {
   type        = number
   description = "Number of failed health checks before failover"

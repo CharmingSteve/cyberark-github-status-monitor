@@ -1,69 +1,137 @@
-# API Gateway for Slack Acknowledgment
-resource "aws_apigatewayv2_api" "lambda" {
-  name          = "github-monitor-api"
-  protocol_type = "HTTP"
-  
-  cors_configuration {
-    allow_origins = ["*"]
-    allow_methods = ["POST", "OPTIONS"]
-    allow_headers = ["content-type"]
-    max_age       = 300
-  }
-  
-  tags = local.common_tags
+resource "aws_api_gateway_rest_api" "lambda" {
+  name        = "github-status-api"
+  description = "API Gateway for GitHub Status Monitor"
 }
 
-# API Gateway Stage
-resource "aws_apigatewayv2_stage" "lambda" {
-  api_id      = aws_apigatewayv2_api.lambda.id
-  name        = "prod"
-  auto_deploy = true
+resource "aws_api_gateway_resource" "acknowledge" {
+  rest_api_id = aws_api_gateway_rest_api.lambda.id
+  parent_id   = aws_api_gateway_rest_api.lambda.root_resource_id
+  path_part   = "acknowledge"
+}
+
+resource "aws_api_gateway_method" "acknowledge_post" {
+  rest_api_id   = aws_api_gateway_rest_api.lambda.id
+  resource_id   = aws_api_gateway_resource.acknowledge.id
+  http_method   = "POST"
+  authorization = "NONE"
+}
+
+# Enable CORS
+resource "aws_api_gateway_method" "acknowledge_options" {
+  rest_api_id   = aws_api_gateway_rest_api.lambda.id
+  resource_id   = aws_api_gateway_resource.acknowledge.id
+  http_method   = "OPTIONS"
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_method_response" "options_200" {
+  rest_api_id   = aws_api_gateway_rest_api.lambda.id
+  resource_id   = aws_api_gateway_resource.acknowledge.id
+  http_method   = aws_api_gateway_method.acknowledge_options.http_method
+  status_code   = "200"
   
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Headers" = true
+    "method.response.header.Access-Control-Allow-Methods" = true
+    "method.response.header.Access-Control-Allow-Origin"  = true
+  }
+}
+
+resource "aws_api_gateway_integration" "options" {
+  rest_api_id = aws_api_gateway_rest_api.lambda.id
+  resource_id = aws_api_gateway_resource.acknowledge.id
+  http_method = aws_api_gateway_method.acknowledge_options.http_method
+  type        = "MOCK"
+  
+  request_templates = {
+    "application/json" = "{\"statusCode\": 200}"
+  }
+}
+
+resource "aws_api_gateway_integration_response" "options" {
+  rest_api_id   = aws_api_gateway_rest_api.lambda.id
+  resource_id   = aws_api_gateway_resource.acknowledge.id
+  http_method   = aws_api_gateway_method.acknowledge_options.http_method
+  status_code   = aws_api_gateway_method_response.options_200.status_code
+  
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,X-Amz-Date,Authorization,X-Api-Key'"
+    "method.response.header.Access-Control-Allow-Methods" = "'OPTIONS,POST'"
+    "method.response.header.Access-Control-Allow-Origin"  = "'*'"
+  }
+}
+
+# Method Response
+resource "aws_api_gateway_method_response" "response_200" {
+  rest_api_id = aws_api_gateway_rest_api.lambda.id
+  resource_id = aws_api_gateway_resource.acknowledge.id
+  http_method = aws_api_gateway_method.acknowledge_post.http_method
+  status_code = "200"
+  
+  response_models = {
+    "application/json" = "Empty"
+  }
+
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Origin" = true
+  }
+}
+
+# Integration Responses
+resource "aws_api_gateway_integration_response" "primary_integration_response" {
+  rest_api_id = aws_api_gateway_rest_api.lambda.id
+  resource_id = aws_api_gateway_resource.acknowledge.id
+  http_method = aws_api_gateway_method.acknowledge_post.http_method
+  status_code = aws_api_gateway_method_response.response_200.status_code
+  selection_pattern = ""  # Default response
+
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Origin" = "'*'"
+  }
+}
+
+resource "aws_api_gateway_integration_response" "secondary_integration_response" {
+  rest_api_id = aws_api_gateway_rest_api.lambda.id
+  resource_id = aws_api_gateway_resource.acknowledge.id
+  http_method = aws_api_gateway_method.acknowledge_post.http_method
+  status_code = aws_api_gateway_method_response.response_200.status_code
+  selection_pattern = ".*Task timed out.*"  # Trigger secondary on timeout
+
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Origin" = "'*'"
+  }
+}
+
+resource "aws_api_gateway_deployment" "prod" {
+  rest_api_id = aws_api_gateway_rest_api.lambda.id
+  
+  depends_on = [
+    aws_api_gateway_integration.acknowledgment_handler_integration,
+    aws_api_gateway_integration.acknowledgment_handler_integration_secondary,
+    aws_api_gateway_integration_response.primary_integration_response,
+    aws_api_gateway_integration_response.secondary_integration_response,
+    aws_api_gateway_method_response.response_200
+  ]
+}
+
+resource "aws_api_gateway_stage" "prod" {
+  deployment_id = aws_api_gateway_deployment.prod.id
+  rest_api_id  = aws_api_gateway_rest_api.lambda.id
+  stage_name   = "prod"
+
   access_log_settings {
     destination_arn = aws_cloudwatch_log_group.api_gw.arn
     format = jsonencode({
       requestId               = "$context.requestId"
-      sourceIp                = "$context.identity.sourceIp"
-      requestTime             = "$context.requestTime"
-      protocol                = "$context.protocol"
-      httpMethod              = "$context.httpMethod"
-      resourcePath            = "$context.resourcePath"
-      routeKey                = "$context.routeKey"
-      status                  = "$context.status"
-      responseLength          = "$context.responseLength"
+      sourceIp               = "$context.identity.sourceIp"
+      requestTime            = "$context.requestTime"
+      protocol               = "$context.protocol"
+      httpMethod             = "$context.httpMethod"
+      resourcePath           = "$context.resourcePath"
+      routeKey               = "$context.routeKey"
+      status                 = "$context.status"
+      responseLength         = "$context.responseLength"
       integrationErrorMessage = "$context.integrationErrorMessage"
     })
   }
-  
-  tags = local.common_tags
-}
-
-# API Gateway Route
-variable "handler_function_name" {
-  type        = string
-  description = "Name of the Lambda function to handle API Gateway requests"
-  default     = "acknowledgment_handler"
-}
-
-resource "aws_apigatewayv2_integration" "acknowledgment_handler" {
-  api_id                 = aws_apigatewayv2_api.lambda.id
-  integration_type       = "AWS_PROXY"
-  integration_uri        = aws_lambda_function[var.handler_function_name].invoke_arn
-  integration_method     = "POST"
-  payload_format_version = "2.0"
-}
-
-# API Gateway Route
-resource "aws_apigatewayv2_route" "acknowledgment_handler" {
-  api_id    = aws_apigatewayv2_api.lambda.id
-  route_key = "POST /acknowledge"
-  target    = "integrations/${aws_apigatewayv2_integration.acknowledgment_handler.id}"
-}
-
-# CloudWatch Log Group for API Gateway
-resource "aws_cloudwatch_log_group" "api_gw" {
-  name              = "/aws/api_gw/${aws_apigatewayv2_api.lambda.name}"
-  retention_in_days = 30
-  
-  tags = local.common_tags
 }

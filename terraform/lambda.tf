@@ -1,3 +1,30 @@
+locals {
+  lambda_environment_vars_github_monitor = {
+    DYNAMODB_TABLE      = aws_dynamodb_table.github_status.id
+    SLACK_WEBHOOK_URL   = var.slack_webhook_url
+    SLACK_API_TOKEN     = var.slack_api_token
+    GITHUB_SERVICES     = jsonencode(var.github_services)
+    MONITORING_INTERVAL = var.monitoring_interval
+    ESCALATION_TIMEOUT  = var.escalation_timeout
+    ESCALATION_CONTACT  = var.escalation_contact
+    HEARTBEAT_BUCKET    = var.heartbeat_bucket_name
+    HEARTBEAT_FILE      = "heartbeat.html"
+  }
+
+  lambda_environment_vars_acknowledgment_handler = {
+    DYNAMODB_TABLE    = aws_dynamodb_table.github_status.id
+    SLACK_WEBHOOK_URL = var.slack_webhook_url
+    SLACK_API_TOKEN   = var.slack_api_token
+  }
+
+  lambda_environment_vars_escalation_handler = {
+    DYNAMODB_TABLE      = aws_dynamodb_table.github_status.id
+    SLACK_WEBHOOK_URL   = var.slack_webhook_url
+    ESCALATION_TIMEOUT  = var.escalation_timeout
+    ESCALATION_CONTACT  = var.escalation_contact
+  }
+}
+
 # Archive source code for Lambda functions
 data "archive_file" "github_monitor_zip" {
   type        = "zip"
@@ -88,17 +115,42 @@ resource "aws_lambda_function" "github_monitor_secondary" {
   tags = local.common_tags
 }
 
-# API Gateway Integration for Acknowledgment Handler (Primary region only)
-resource "aws_apigatewayv2_integration" "acknowledgment_handler_integration" {
-  count            = var.primary_region ? 1 : 0
-  api_id           = aws_apigatewayv2_api.lambda.id
-  integration_type = "AWS_PROXY"
+# Additional Secondary Region Lambda Functions
+resource "aws_lambda_function" "acknowledgment_handler_secondary" {
+  provider         = aws.secondary
+  filename         = data.archive_file.acknowledgment_handler_zip.output_path
+  function_name    = "github-acknowledgment-handler-secondary"
+  role             = aws_iam_role.lambda_execution_role.arn
+  handler          = "lambda_function.lambda_handler"
+  source_code_hash = data.archive_file.acknowledgment_handler_zip.output_base64sha256
+  runtime          = "python3.9"
+  timeout          = 30
+  memory_size      = 128
 
-  integration_uri         = aws_lambda_function.acknowledgment_handler.invoke_arn
-  integration_method      = "POST"
-  payload_format_version  = "2.0"
+  environment {
+    variables = local.lambda_environment_vars_acknowledgment_handler
+  }
+
+  tags = local.common_tags
 }
 
+resource "aws_lambda_function" "escalation_handler_secondary" {
+  provider         = aws.secondary
+  filename         = data.archive_file.escalation_handler_zip.output_path
+  function_name    = "github-escalation-handler-secondary"
+  role             = aws_iam_role.lambda_execution_role.arn
+  handler          = "lambda_function.lambda_handler"
+  source_code_hash = data.archive_file.escalation_handler_zip.output_base64sha256
+  runtime          = "python3.9"
+  timeout          = 30
+  memory_size      = 128
+
+  environment {
+    variables = local.lambda_environment_vars_escalation_handler
+  }
+
+  tags = local.common_tags
+}
 
 resource "aws_lambda_permission" "api_gw_acknowledgment_handler" {
   count         = var.primary_region ? 1 : 0
@@ -106,6 +158,38 @@ resource "aws_lambda_permission" "api_gw_acknowledgment_handler" {
   action        = "lambda:InvokeFunction"
   function_name = aws_lambda_function.acknowledgment_handler.function_name
   principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.lambda.execution_arn}/*/*"
+}
 
-  source_arn = "${aws_apigatewayv2_api.lambda.execution_arn}/*/*"
+# Lambda permission for secondary region handler
+resource "aws_lambda_permission" "api_gw_acknowledgment_handler_secondary" {
+  provider      = aws.secondary
+  statement_id  = "AllowExecutionFromAPIGateway"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.acknowledgment_handler_secondary.function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.lambda.execution_arn}/*/*"
+}
+
+# API Gateway Integration for Primary Lambda
+resource "aws_api_gateway_integration" "acknowledgment_handler_integration" {
+  rest_api_id             = aws_api_gateway_rest_api.lambda.id
+  resource_id             = aws_api_gateway_resource.acknowledge.id
+  http_method             = "POST"
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = aws_lambda_function.acknowledgment_handler.invoke_arn
+  timeout_milliseconds    = 29000
+}
+
+# API Gateway Integration for Secondary Lambda (Failover)
+resource "aws_api_gateway_integration" "acknowledgment_handler_integration_secondary" {
+  rest_api_id             = aws_api_gateway_rest_api.lambda.id
+  resource_id             = aws_api_gateway_resource.acknowledge.id
+  http_method             = "POST"
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = aws_lambda_function.acknowledgment_handler_secondary.invoke_arn
+  timeout_milliseconds    = 29000
+  connection_type         = "INTERNET"
 }
