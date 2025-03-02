@@ -37,15 +37,13 @@ jobs:
           cd terraform
           terraform validate
 
-      - name: Terraform Plan
-        id: plan
+      - name: Terraform Apply
+        if: github.ref == 'refs/heads/main'
         run: |
           cd terraform
-          terraform plan \
-            -var="slack_api_token=${{ secrets.SLACK_API_TOKEN }}" \
-            -var="slack_webhook_url=${{ secrets.SLACK_WEBHOOK_URL }}" \
-            -out=tfplan
-          echo "::set-output name=stdout::$($(cat tfplan))"
+          terraform apply -auto-approve tfplan \
+          -var="slack_api_token=${{ secrets.SLACK_API_TOKEN }}" \
+          -var="slack_webhook_url=${{ secrets.SLACK_WEBHOOK_URL }}"
 
       - name: Save Terraform Plan Artifact
         uses: actions/upload-artifact@v4

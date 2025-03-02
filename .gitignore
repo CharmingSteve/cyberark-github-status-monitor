@@ -176,7 +176,6 @@ cython_debug/
 .terraform/
 .terraform.lock.hcl
 
-
 # MacOS System files
 .DS_Store
 **/.DS_Store
