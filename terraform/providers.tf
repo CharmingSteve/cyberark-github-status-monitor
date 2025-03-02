@@ -6,7 +6,7 @@ terraform {
     }
     statuscake = {
       source  = "StatusCakeDev/statuscake"
-      version = "~> 2.0.0"
+      version = "~> 2.1.0"  # Updated to latest 2.x version
     }
   }
   required_version = ">= 1.0.0"
