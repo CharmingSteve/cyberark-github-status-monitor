@@ -1,18 +1,18 @@
 data "archive_file" "github_monitor_zip" {
   type        = "zip"
-  source_dir  = "./src/github_monitor"
+  source_dir  = "../src/github_monitor"
   output_path = "./lambda_packages/github_monitor.zip"
 }
 
 data "archive_file" "acknowledgment_handler_zip" {
   type        = "zip"
-  source_dir  = "./src/acknowledgment_handler"
+  source_dir  = "../src/acknowledgment_handler"
   output_path = "./lambda_packages/acknowledgment_handler.zip"
 }
 
 data "archive_file" "escalation_handler_zip" {
   type        = "zip"
-  source_dir  = "./src/escalation_handler"
+  source_dir  = "../src/escalation_handler"
   output_path = "./lambda_packages/escalation_handler.zip"
 }
 

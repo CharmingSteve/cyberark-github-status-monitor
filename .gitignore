@@ -175,3 +175,8 @@ cython_debug/
 *.tfstate.backup
 .terraform/
 .terraform.lock.hcl
+
+
+# MacOS System files
+.DS_Store
+**/.DS_Store
