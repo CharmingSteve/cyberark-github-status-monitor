@@ -4,10 +4,6 @@ terraform {
       source  = "hashicorp/aws"
       version = "~> 4.0"
     }
-    statuscake = {
-      source  = "StatusCakeDev/statuscake"
-      version = "~> 2.1.0"  # Updated to latest 2.x version
-    }
   }
   required_version = ">= 1.0.0"
 }
@@ -21,9 +17,4 @@ provider "aws" {
 provider "aws" {
   alias  = "secondary"
   region = var.secondary_region
-}
-
-# StatusCake provider
-provider "statuscake" {
-  api_token = var.statuscake_api_key
 }

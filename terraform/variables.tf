@@ -22,12 +22,6 @@ variable "slack_webhook_url" {
   sensitive   = true
 }
 
-variable "statuscake_api_key" {
-  description = "StatusCake API key"
-  type        = string
-  sensitive   = true
-}
-
 variable "github_services" {
   description = "GitHub services to monitor"
   type        = list(string)
