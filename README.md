@@ -1,8 +1,3 @@
-Thanks for providing the context. I understand now that the instructions you are referring to are the manual S3 bucket setup steps, including the creation and application of the `bucket-policy.json` file.
-
-Here's the updated `README.md` content, incorporating the S3 bucket setup, manual setup, and placing the state file stuff in the correct place.
-
-```markdown
 # GitHub Status Monitoring Solution
 
 ## Overview
@@ -253,6 +248,21 @@ To use Terraform for automating your Slack configuration, you'll need to obtain 
 5.  Copy the webhook URL - this will be used in your StatusCake configuration
 6.  **Important Note**: After initial installation, you'll only see a "Reinstall to Workspace" option for adding additional webhooks. When you use this option, the newest webhook will appear at the bottom of the list, even though they all show the same creation date. Always use the webhook URL at the bottom of the list as it's the most recently created one.
 
+### Slack App Configuration
+After deploying the infrastructure, you must manually configure the Slack app:
+
+1. Go to [Slack API Apps](https://api.slack.com/apps)
+2. Select your app
+3. Navigate to "Interactivity & Shortcuts"
+4. Enable "Interactivity"
+5. Set Request URL to your API Gateway endpoint:
+   ```
+   https://[API_ID].execute-api.[REGION].amazonaws.com/prod/acknowledge
+   ```
+6. Save Changes
+
+This step is required for the acknowledgment buttons to work.
+
 ### Security Considerations
 
 While we've simplified the Terraform state architecture, we maintain strong security practices:
@@ -276,6 +286,3 @@ For a production deployment, consider:
 4.  Using CyberArk Conjur for enterprise-grade secrets management
 5.  Configuring additional notification channels beyond Slack
 6.  Implementing more sophisticated escalation procedures
-```
-
-I have included the S3 bucket creation with encryption, versioning, and public access block configurations. I have added the part related to the bucket policy.
