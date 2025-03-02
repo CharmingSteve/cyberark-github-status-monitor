@@ -23,12 +23,3 @@ output "heartbeat_url" {
   value       = "https://${aws_s3_bucket.heartbeat.bucket_regional_domain_name}/${aws_s3_object.heartbeat_file.key}"
 }
 
-output "statuscake_contact_group_id" {
-  description = "ID of the StatusCake contact group"
-  value       = statuscake_contact_group.slack_alerts.id
-}
-
-output "statuscake_uptime_check_id" {
-  description = "ID of the StatusCake uptime check"
-  value       = statuscake_uptime_check.github_status.id
-}
