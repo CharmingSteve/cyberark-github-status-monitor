@@ -88,6 +88,10 @@ resource "aws_api_gateway_integration_response" "primary_integration_response" {
   response_parameters = {
     "method.response.header.Access-Control-Allow-Origin" = "'*'"
   }
+
+  depends_on = [
+    aws_api_gateway_integration.acknowledgment_handler_integration
+  ]
 }
 
 resource "aws_api_gateway_integration_response" "secondary_integration_response" {
@@ -100,6 +104,10 @@ resource "aws_api_gateway_integration_response" "secondary_integration_response"
   response_parameters = {
     "method.response.header.Access-Control-Allow-Origin" = "'*'"
   }
+
+  depends_on = [
+    aws_api_gateway_integration.acknowledgment_handler_integration_secondary
+  ]
 }
 
 resource "aws_api_gateway_deployment" "prod" {
@@ -134,4 +142,8 @@ resource "aws_api_gateway_stage" "prod" {
       integrationErrorMessage = "$context.integrationErrorMessage"
     })
   }
+
+  depends_on = [
+    aws_api_gateway_account.main
+  ]
 }
