@@ -1,4 +1,3 @@
-
 data "archive_file" "github_monitor_zip" {
   type        = "zip"
   source_dir  = "./src/github_monitor"
@@ -85,53 +84,6 @@ resource "aws_lambda_function" "github_monitor_secondary" {
   }
   
   tags = local.common_tags
-}
-
-# CloudWatch Event Target for GitHub Monitor
-resource "aws_cloudwatch_event_target" "github_monitor_target" {
-  rule      = aws_cloudwatch_event_rule.github_monitor_schedule.name
-  arn       = aws_lambda_function.github_monitor.arn
-}
-
-# CloudWatch Event Target for GitHub Monitor in secondary region
-resource "aws_cloudwatch_event_target" "github_monitor_target_secondary" {
-  provider  = aws.secondary
-  rule      = aws_cloudwatch_event_rule.github_monitor_schedule_secondary.name
-  arn       = aws_lambda_function.github_monitor_secondary.arn
-}
-
-# CloudWatch Event Target for Escalation Handler
-resource "aws_cloudwatch_event_target" "escalation_handler_target" {
-  rule      = aws_cloudwatch_event_rule.escalation_check_schedule.name
-  arn       = aws_lambda_function.escalation_handler.arn
-}
-
-# Lambda permission for CloudWatch Events to invoke GitHub Monitor
-resource "aws_lambda_permission" "allow_cloudwatch_to_call_github_monitor" {
-  statement_id  = "AllowExecutionFromCloudWatch"
-  action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.github_monitor.function_name
-  principal     = "events.amazonaws.com"
-  source_arn    = aws_cloudwatch_event_rule.github_monitor_schedule.arn
-}
-
-# Lambda permission for CloudWatch Events to invoke GitHub Monitor in secondary region
-resource "aws_lambda_permission" "allow_cloudwatch_to_call_github_monitor_secondary" {
-  provider      = aws.secondary
-  statement_id  = "AllowExecutionFromCloudWatch"
-  action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.github_monitor_secondary.function_name
-  principal     = "events.amazonaws.com"
-  source_arn    = aws_cloudwatch_event_rule.github_monitor_schedule_secondary.arn
-}
-
-# Lambda permission for CloudWatch Events to invoke Escalation Handler
-resource "aws_lambda_permission" "allow_cloudwatch_to_call_escalation_handler" {
-  statement_id  = "AllowExecutionFromCloudWatch"
-  action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.escalation_handler.function_name
-  principal     = "events.amazonaws.com"
-  source_arn    = aws_cloudwatch_event_rule.escalation_check_schedule.arn
 }
 
 # API Gateway Integration for Acknowledgment Handler
