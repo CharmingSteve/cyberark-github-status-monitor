@@ -1,91 +1,161 @@
-# Source code archives
+
 data "archive_file" "github_monitor_zip" {
   type        = "zip"
-  output_path = "${path.module}/files/github_monitor.zip"
-  source_dir  = "${path.module}/src/github_monitor"
+  source_dir  = "./src/github_monitor"
+  output_path = "./lambda_packages/github_monitor.zip"
 }
 
 data "archive_file" "acknowledgment_handler_zip" {
   type        = "zip"
-  output_path = "${path.module}/files/acknowledgment_handler.zip"
-  source_dir  = "${path.module}/src/acknowledgment_handler"
+  source_dir  = "./src/acknowledgment_handler"
+  output_path = "./lambda_packages/acknowledgment_handler.zip"
 }
 
 data "archive_file" "escalation_handler_zip" {
   type        = "zip"
-  output_path = "${path.module}/files/escalation_handler.zip"
-  source_dir  = "${path.module}/src/escalation_handler"
+  source_dir  = "./src/escalation_handler"
+  output_path = "./lambda_packages/escalation_handler.zip"
 }
 
-# Lambda functions - GitHub Monitor
 resource "aws_lambda_function" "github_monitor" {
-  function_name    = "github-status-monitor"
   filename         = data.archive_file.github_monitor_zip.output_path
-  source_code_hash = data.archive_file.github_monitor_zip.output_base64sha256
-  handler          = "main.lambda_handler"
-  runtime          = "python3.9"
-  timeout          = 30
-  memory_size      = 128
+  function_name    = "github-status-monitor"
   role             = aws_iam_role.lambda_execution_role.arn
-  environment {
-    variables = local.lambda_environment_vars_github_monitor
-  }
-  tags = local.common_tags
-}
-
-resource "aws_lambda_function" "github_monitor_secondary" {
-  provider         = aws.secondary
-  function_name    = "github-status-monitor"
-  filename         = data.archive_file.github_monitor_zip.output_path
+  handler          = "lambda_function.lambda_handler"
   source_code_hash = data.archive_file.github_monitor_zip.output_base64sha256
-  handler          = "main.lambda_handler"
   runtime          = "python3.9"
   timeout          = 30
   memory_size      = 128
-  role             = aws_iam_role.lambda_execution_role_secondary.arn
+  
   environment {
     variables = local.lambda_environment_vars_github_monitor
   }
+  
   tags = local.common_tags
 }
 
-# Lambda functions - Acknowledgment Handler
 resource "aws_lambda_function" "acknowledgment_handler" {
-  function_name    = "github-acknowledgment-handler"
   filename         = data.archive_file.acknowledgment_handler_zip.output_path
+  function_name    = "github-acknowledgment-handler"
+  role             = aws_iam_role.lambda_execution_role.arn
+  handler          = "lambda_function.lambda_handler"
   source_code_hash = data.archive_file.acknowledgment_handler_zip.output_base64sha256
-  handler          = "main.lambda_handler"
   runtime          = "python3.9"
   timeout          = 30
   memory_size      = 128
-  role             = aws_iam_role.lambda_execution_role.arn
+  
   environment {
     variables = local.lambda_environment_vars_acknowledgment_handler
   }
+  
   tags = local.common_tags
 }
 
-# Lambda functions - Escalation Handler
 resource "aws_lambda_function" "escalation_handler" {
-  function_name    = "github-escalation-handler"
   filename         = data.archive_file.escalation_handler_zip.output_path
+  function_name    = "github-escalation-handler"
+  role             = aws_iam_role.lambda_execution_role.arn
+  handler          = "lambda_function.lambda_handler"
   source_code_hash = data.archive_file.escalation_handler_zip.output_base64sha256
-  handler          = "main.lambda_handler"
   runtime          = "python3.9"
   timeout          = 30
   memory_size      = 128
-  role             = aws_iam_role.lambda_execution_role.arn
+  
   environment {
     variables = local.lambda_environment_vars_escalation_handler
   }
+  
   tags = local.common_tags
 }
 
-# Lambda permission for API Gateway
-resource "aws_lambda_permission" "api_gateway" {
+# Secondary region Lambda function
+resource "aws_lambda_function" "github_monitor_secondary" {
+  provider         = aws.secondary
+  filename         = data.archive_file.github_monitor_zip.output_path
+  function_name    = "github-status-monitor"
+  role             = aws_iam_role.lambda_execution_role_secondary.arn
+  handler          = "lambda_function.lambda_handler"
+  source_code_hash = data.archive_file.github_monitor_zip.output_base64sha256
+  runtime          = "python3.9"
+  timeout          = 30
+  memory_size      = 128
+  
+  environment {
+    variables = local.lambda_environment_vars_github_monitor
+  }
+  
+  tags = local.common_tags
+}
+
+# CloudWatch Event Target for GitHub Monitor
+resource "aws_cloudwatch_event_target" "github_monitor_target" {
+  rule      = aws_cloudwatch_event_rule.github_monitor_schedule.name
+  arn       = aws_lambda_function.github_monitor.arn
+}
+
+# CloudWatch Event Target for GitHub Monitor in secondary region
+resource "aws_cloudwatch_event_target" "github_monitor_target_secondary" {
+  provider  = aws.secondary
+  rule      = aws_cloudwatch_event_rule.github_monitor_schedule_secondary.name
+  arn       = aws_lambda_function.github_monitor_secondary.arn
+}
+
+# CloudWatch Event Target for Escalation Handler
+resource "aws_cloudwatch_event_target" "escalation_handler_target" {
+  rule      = aws_cloudwatch_event_rule.escalation_check_schedule.name
+  arn       = aws_lambda_function.escalation_handler.arn
+}
+
+# Lambda permission for CloudWatch Events to invoke GitHub Monitor
+resource "aws_lambda_permission" "allow_cloudwatch_to_call_github_monitor" {
+  statement_id  = "AllowExecutionFromCloudWatch"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.github_monitor.function_name
+  principal     = "events.amazonaws.com"
+  source_arn    = aws_cloudwatch_event_rule.github_monitor_schedule.arn
+}
+
+# Lambda permission for CloudWatch Events to invoke GitHub Monitor in secondary region
+resource "aws_lambda_permission" "allow_cloudwatch_to_call_github_monitor_secondary" {
+  provider      = aws.secondary
+  statement_id  = "AllowExecutionFromCloudWatch"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.github_monitor_secondary.function_name
+  principal     = "events.amazonaws.com"
+  source_arn    = aws_cloudwatch_event_rule.github_monitor_schedule_secondary.arn
+}
+
+# Lambda permission for CloudWatch Events to invoke Escalation Handler
+resource "aws_lambda_permission" "allow_cloudwatch_to_call_escalation_handler" {
+  statement_id  = "AllowExecutionFromCloudWatch"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.escalation_handler.function_name
+  principal     = "events.amazonaws.com"
+  source_arn    = aws_cloudwatch_event_rule.escalation_check_schedule.arn
+}
+
+# API Gateway Integration for Acknowledgment Handler
+resource "aws_apigatewayv2_integration" "acknowledgment_handler_integration" {
+  api_id           = aws_apigatewayv2_api.lambda.id
+  integration_type = "AWS_PROXY"
+  
+  integration_uri    = aws_lambda_function.acknowledgment_handler.invoke_arn
+  integration_method = "POST"
+  payload_format_version = "2.0"
+}
+
+resource "aws_apigatewayv2_route" "acknowledgment_handler_route" {
+  api_id    = aws_apigatewayv2_api.lambda.id
+  route_key = "POST /acknowledge"
+  
+  target = "integrations/${aws_apigatewayv2_integration.acknowledgment_handler_integration.id}"
+}
+
+resource "aws_lambda_permission" "api_gw_acknowledgment_handler" {
   statement_id  = "AllowExecutionFromAPIGateway"
   action        = "lambda:InvokeFunction"
   function_name = aws_lambda_function.acknowledgment_handler.function_name
   principal     = "apigateway.amazonaws.com"
-  source_arn    = "${aws_apigatewayv2_api.lambda.execution_arn}/*/*"
+  
+  source_arn = "${aws_apigatewayv2_api.lambda.execution_arn}/*/*"
 }
