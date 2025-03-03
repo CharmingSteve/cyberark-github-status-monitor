@@ -1,6 +1,6 @@
 locals {
   lambda_environment_vars_github_monitor = {
-    DYNAMODB_TABLE      = aws_dynamodb_table.github_status.id
+    DYNAMODB_TABLE      = aws_dynamodb_table.github_status_monitor.id
     SLACK_WEBHOOK_URL   = var.slack_webhook_url
     SLACK_API_TOKEN     = var.slack_api_token
     GITHUB_SERVICES     = jsonencode(var.github_services)
@@ -12,13 +12,13 @@ locals {
   }
 
   lambda_environment_vars_acknowledgment_handler = {
-    DYNAMODB_TABLE    = aws_dynamodb_table.github_status.id
+    DYNAMODB_TABLE    = aws_dynamodb_table.github_status_monitor.id
     SLACK_WEBHOOK_URL = var.slack_webhook_url
     SLACK_API_TOKEN   = var.slack_api_token
   }
 
   lambda_environment_vars_escalation_handler = {
-    DYNAMODB_TABLE      = aws_dynamodb_table.github_status.id
+    DYNAMODB_TABLE      = aws_dynamodb_table.github_status_monitor.id
     SLACK_WEBHOOK_URL   = var.slack_webhook_url
     ESCALATION_TIMEOUT  = var.escalation_timeout
     ESCALATION_CONTACT  = var.escalation_contact

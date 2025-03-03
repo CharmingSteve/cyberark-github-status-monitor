@@ -15,7 +15,7 @@ output "acknowledgment_api_gateway_url" {
 
 output "dynamodb_table_name" {
   description = "Name of the DynamoDB table for GitHub status"
-  value       = aws_dynamodb_table.github_status.name
+  value       = aws_dynamodb_table.github_status_monitor.name
 }
 
 output "heartbeat_url" {

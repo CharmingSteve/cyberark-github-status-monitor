@@ -3,6 +3,8 @@ import os
 import time
 import urllib3
 import boto3
+import urllib.parse
+from datetime import datetime
 
 # Environment variables
 DYNAMODB_TABLE = os.environ['DYNAMODB_TABLE']
@@ -15,71 +17,171 @@ ESCALATION_CONTACT = os.environ['ESCALATION_CONTACT']
 HEARTBEAT_BUCKET = os.environ['HEARTBEAT_BUCKET']
 HEARTBEAT_FILE = os.environ['HEARTBEAT_FILE']
 
-# Clients
+# AWS Clients
 dynamodb = boto3.resource('dynamodb')
 table = dynamodb.Table(DYNAMODB_TABLE)
-s3 = boto3.client('s3')
 http = urllib3.PoolManager()
 
-def lambda_handler(event, context): 
-    """
-    Monitors GitHub service statuses and sends alerts to Slack.
-    """
+def send_incident_to_slack(service_name, incident_id, description, is_test=False):
+    """Stores incident in DynamoDB and sends Slack notification."""
+    timestamp = datetime.utcnow().isoformat()
+    
+    # Check if incident already exists using the GSI
+    response = table.query(
+        IndexName='incident_id-index',
+        KeyConditionExpression='incident_id = :incident_id',
+        ExpressionAttributeValues={':incident_id': incident_id}
+    )
+    
+    if response.get('Items'):
+        print(f"Incident {incident_id} already exists. Skipping duplicate entry.")
+        return
+    
+    # Step 1: Store the incident in DynamoDB
+    table.put_item(
+        Item={
+            'service_name': service_name,
+            'timestamp': timestamp,
+            'incident_id': incident_id,
+            'status': 'active',
+            'description': description,
+            'is_test': is_test,  # Mark test messages
+            'acknowledged': False  # Add acknowledgment tracking
+        }
+    )
+    
+    # Step 2: Send Slack message with acknowledgment button
+    slack_message = {
+        "text": f"{'🟢 TEST: ' if is_test else '🔴 Incident Alert: '} {service_name} is experiencing an issue!",
+        "attachments": [
+            {
+                "text": description,
+                "fallback": "Acknowledge Incident",
+                "callback_id": "incident_acknowledgment",
+                "color": "#FF0000" if not is_test else "#36a64f",
+                "actions": [
+                    {
+                        "name": "acknowledge",
+                        "text": "Acknowledge",
+                        "type": "button",
+                        "value": incident_id
+                    }
+                ]
+            }
+        ]
+    }
+    
+    response = http.request(
+        'POST',
+        SLACK_WEBHOOK_URL,
+        body=json.dumps(slack_message).encode('utf-8'),
+        headers={'Content-Type': 'application/json'}
+    )
+    
+    print(f"Slack response: {response.status}, {response.data}")
+
+def handle_acknowledgment(event):
+    """Handles the acknowledgment of an incident from Slack."""
     try:
-        print(f"Lambda started with event: {event}")  # Debug print
-        print(f"SLACK_WEBHOOK_URL is set: {bool(SLACK_WEBHOOK_URL)}")  # Check if env var exists
-
-        # Send deployment notification
-        if context.aws_request_id.endswith('00000000'):  # This happens on first invocation after deployment
-            print("Sending deployment notification")  # Debug print
-            test_incident = {
-                'id': 'deployment-notification',
-                'shortlink': 'https://www.githubstatus.com/',
-                'body': 'GitHub Status Monitor has been deployed/updated and is running!'
-            }
-            send_slack_message("GitHub Status Monitor", 'DEPLOYMENT', test_incident)
-            print("Deployment notification sent")  # Debug print
-
-        # Check if this is a test request
-        if event.get('test'):
-            print("Test mode detected, sending test message")  # Debug print
-            test_incident = {
-                'id': 'test-incident-001',
-                'shortlink': 'https://www.githubstatus.com/',
-                'body': 'This is a test alert from the GitHub Status Monitor. If you see this, Slack integration is working!'
-            }
-            send_slack_message("GitHub Status Monitor", 'TEST', test_incident)
-            print("Test message sent")  # Debug print
+        # Parse the payload from the Slack button click
+        body = event.get('body', '')
+        if not body:
             return {
-                'statusCode': 200,
-                'body': json.dumps('Test alert sent to Slack')
+                'statusCode': 400,
+                'body': json.dumps({'message': 'No body in request'})
             }
+        
+        # The body is URL encoded, so we need to parse it
+        parsed_body = urllib.parse.parse_qs(body)
+        payload = json.loads(parsed_body['payload'][0])
+        
+        incident_id = payload['actions'][0]['value']
+        user_name = payload['user']['name']
+        user_id = payload['user']['id']
+        
+        # Find the incident in DynamoDB using the GSI
+        response = table.query(
+            IndexName='incident_id-index',
+            KeyConditionExpression='incident_id = :incident_id',
+            ExpressionAttributeValues={':incident_id': incident_id}
+        )
+        
+        if not response.get('Items'):
+            return {
+                'statusCode': 404,
+                'body': json.dumps({'message': f'Incident {incident_id} not found'})
+            }
+        
+        incident = response['Items'][0]
+        
+        # Update the incident with acknowledgment info
+        table.update_item(
+            Key={
+                'service_name': incident['service_name'],
+                'timestamp': incident['timestamp']
+            },
+            UpdateExpression='SET acknowledged = :ack, acknowledged_by = :user, acknowledged_at = :time',
+            ExpressionAttributeValues={
+                ':ack': True,
+                ':user': f"{user_name} ({user_id})",
+                ':time': datetime.utcnow().isoformat()
+            }
+        )
 
-        # Normal operation continues here
-        check_heartbeat()
-
-        # Get GitHub status
-        status_data = get_github_status()
-
-        # Process each service defined in GITHUB_SERVICES
-        for service_name in GITHUB_SERVICES:
-            component = next((comp for comp in status_data['components'] if comp['name'] == service_name), None)
-            if component:
-                process_github_service(component)
-
-        # Update heartbeat after successful run
-        update_heartbeat()
-
+        # Also store in the acknowledgments table
+        ack_table = dynamodb.Table('github-incident-acknowledgments')
+        ack_table.put_item(
+            Item={
+                'incident_id': incident_id,
+                'acknowledged_by': f"{user_name} ({user_id})",
+                'acknowledged_at': datetime.utcnow().isoformat(),
+                'service_name': incident['service_name']
+            }
+        )
+        
+        # Send confirmation message back to Slack
+        confirmation_message = {
+            "text": f":white_check_mark: Incident `{incident_id}` has been acknowledged by {user_name}",
+            "replace_original": False
+        }
+        
+        http.request(
+            'POST',
+            payload['response_url'],
+            body=json.dumps(confirmation_message).encode('utf-8'),
+            headers={'Content-Type': 'application/json'}
+        )
+        
         return {
             'statusCode': 200,
-            'body': json.dumps('GitHub status check completed successfully.')
+            'body': json.dumps({'message': 'Acknowledgment processed successfully'})
         }
+        
     except Exception as e:
-        print(f"Error: {e}")
+        print(f"Error processing acknowledgment: {str(e)}")
         return {
             'statusCode': 500,
-            'body': json.dumps(f'An error occurred: {str(e)}')
+            'body': json.dumps({'message': f'Error processing acknowledgment: {str(e)}'})
         }
+
+def lambda_handler(event, context):
+    """Main Lambda entry point."""
+    # Check if this is an acknowledgment from Slack
+    if event.get('requestContext', {}).get('resourcePath') == '/acknowledge':
+        return handle_acknowledgment(event)
+        
+    # If not an acknowledgment, proceed with the original monitoring logic
+    is_test = event.get('test', False)
+    
+    for service_name in GITHUB_SERVICES:
+        incident_id = f"test-incident-{int(time.time())}" if is_test else f"incident-{int(time.time())}"
+        description = f"Service {service_name} is {'TESTING alert.' if is_test else 'down. Investigating.'}"
+        send_incident_to_slack(service_name, incident_id, description, is_test=is_test)
+    
+    return {
+        'statusCode': 200,
+        'body': json.dumps({'message': 'Incident notifications sent'})
+    }
 
 def check_heartbeat():
     """

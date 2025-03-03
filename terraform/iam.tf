@@ -37,9 +37,8 @@ resource "aws_iam_policy" "lambda_dynamodb_policy" {
         ]
         Effect   = "Allow"
         Resource = [
-          aws_dynamodb_table.github_status.arn,
-          "${aws_dynamodb_table.github_status.arn}/index/*",
-          aws_dynamodb_table.incident_acknowledgments.arn
+          aws_dynamodb_table.github_status_monitor.arn,
+          "${aws_dynamodb_table.github_status_monitor.arn}/index/*"
         ]
       }
     ]
