@@ -69,3 +69,27 @@ variable "failover_threshold" {
   description = "Number of failed health checks before failover"
   default     = 3
 }
+
+variable "dynamodb_table" {
+  description = "DynamoDB table name for storing data"
+  type        = string
+  default     = "github-status-monitor"
+}
+
+variable "heartbeat_bucket" {
+  description = "S3 bucket for heartbeat"
+  type        = string
+  default     = "github_monitor_heartbeat"
+}
+
+variable "heartbeat_file" {
+  description = "Heartbeat file name"
+  type        = string
+  default     = "heartbeat.txt"
+}
+
+variable "service_name" {
+  description = "Name of the service"
+  type        = string
+  default     = "github_monitor_service"
+}

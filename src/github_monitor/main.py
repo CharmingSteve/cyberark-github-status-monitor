@@ -6,16 +6,27 @@ import boto3
 import urllib.parse
 from datetime import datetime
 
-# Environment variables
+# Environment variablesDYNAMODB_TABLE = os.environ['DYNAMODB_TABLE']
 DYNAMODB_TABLE = os.environ['DYNAMODB_TABLE']
 SLACK_WEBHOOK_URL = os.environ['SLACK_WEBHOOK_URL']
 SLACK_API_TOKEN = os.environ['SLACK_API_TOKEN']
-GITHUB_SERVICES = json.loads(os.environ['GITHUB_SERVICES'])
+GITHUB_SERVICES = os.environ['GITHUB_SERVICES'] # No json.loads() here
 MONITORING_INTERVAL = int(os.environ['MONITORING_INTERVAL'])
 ESCALATION_TIMEOUT = int(os.environ['ESCALATION_TIMEOUT'])
 ESCALATION_CONTACT = os.environ['ESCALATION_CONTACT']
 HEARTBEAT_BUCKET = os.environ['HEARTBEAT_BUCKET']
 HEARTBEAT_FILE = os.environ['HEARTBEAT_FILE']
+SERVICE_NAME = os.environ['SERVICE_NAME']
+
+#DynamoDB resource
+dynamodb = boto3.resource('dynamodb')
+table = dynamodb.Table(DYNAMODB_TABLE)
+
+#S3 client
+s3 = boto3.client('s3')
+
+if isinstance(GITHUB_SERVICES, str):
+    GITHUB_SERVICES = GITHUB_SERVICES.split(',')
 
 # AWS Clients
 dynamodb = boto3.resource('dynamodb')
@@ -163,6 +174,27 @@ def handle_acknowledgment(event):
             'statusCode': 500,
             'body': json.dumps({'message': f'Error processing acknowledgment: {str(e)}'})
         }
+    
+def store_incident(message):
+    """
+    Store the incident in DynamoDB.
+    """
+    timestamp = str(int(time.time()))
+    item = {
+        'service_name': SERVICE_NAME,
+        'timestamp': timestamp,
+        'message': message,
+        'incident_id': f"{SERVICE_NAME}-{timestamp}",  # Create a unique incident ID
+        'acknowledged_by': 'None',
+        'acknowledged_at': 'None'
+    }
+    try:
+        print(f"Attempting to store incident: {item}")  # Add this line BEFORE table.put_item
+        table.put_item(Item=item)
+        print(f"Incident stored in DynamoDB: {item}")
+    except Exception as e:
+        print(f"Error storing incident in DynamoDB: {e}")
+        print(f"Exception details: {e}")  # Add this line
 
 def lambda_handler(event, context):
     """Main Lambda entry point."""

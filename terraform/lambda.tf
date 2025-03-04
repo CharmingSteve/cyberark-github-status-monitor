@@ -56,9 +56,19 @@ resource "aws_lambda_function" "github_monitor" {
   memory_size      = 128
 
   environment {
-    variables = local.lambda_environment_vars_github_monitor
+    variables = {
+      DYNAMODB_TABLE      = var.dynamodb_table
+      SLACK_WEBHOOK_URL   = var.slack_webhook_url
+      SLACK_API_TOKEN     = var.slack_api_token
+      GITHUB_SERVICES     = join(",", var.github_services) # Join the list into a string
+      MONITORING_INTERVAL = var.monitoring_interval
+      ESCALATION_TIMEOUT  = var.escalation_timeout
+      ESCALATION_CONTACT  = var.escalation_contact
+      HEARTBEAT_BUCKET    = var.heartbeat_bucket
+      HEARTBEAT_FILE      = var.heartbeat_file
+      SERVICE_NAME        = var.service_name
+    }
   }
-
   tags = local.common_tags
 }
 
