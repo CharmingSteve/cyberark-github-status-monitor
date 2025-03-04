@@ -11,37 +11,7 @@ SLACK_WEBHOOK_URL = os.environ['SLACK_WEBHOOK_URL']
 dynamodb = boto3.resource('dynamodb')
 table = dynamodb.Table(DYNAMODB_TABLE)
 
-def lambda_handler(event, context):
-    """
-    Handles incident acknowledgment.
-    """
-    try:
-        body = json.loads(event['body'])
-        payload = json.loads(body['payload'])
-        
-        # Extract info from the Slack action
-        action = payload['actions'][0]
-        action_id = action['action_id']
-        user = payload['user']['name']
-        incident_id = action['value']
-        
-        # Process acknowledgment if it is the action ID
-        if action_id == 'acknowledge_incident':
-            return acknowledge_incident(incident_id, user)
-        else:
-            return {
-                'statusCode': 400,
-                'body': json.dumps('Unknown action')
-            }
-
-    except Exception as e:
-        print(f"Error: {e}")
-        return {
-            'statusCode': 500,
-            'body': json.dumps(f'An error occurred: {str(e)}')
-        }
-
-def acknowledge_incident(incident_id, user):
+def acknowledge_incident(incident_id, user, user_name):  # Add user_name parameter
     """
     Acknowledges an incident in DynamoDB and sends a follow-up message to Slack.
     """
@@ -49,12 +19,12 @@ def acknowledge_incident(incident_id, user):
         # Acknowledge in DynamoDB
         table.put_item(Item={
             'incident_id': incident_id,
-            'acknowledged_by': user
+            'acknowledged_by': user,
+            'user_name': user_name  # Add this line to store username
         })
 
         # Send Slack confirmation message
-        send_acknowledgment_confirmation(incident_id, user)
-
+        send_acknowledgment_confirmation(incident_id, user_name)  # Use user_name instead of user
         return {
             'statusCode': 200,
             'body': json.dumps('Incident acknowledgment processed successfully.')

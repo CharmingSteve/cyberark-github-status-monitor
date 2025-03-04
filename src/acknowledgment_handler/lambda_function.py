@@ -8,10 +8,9 @@ from boto3.dynamodb.conditions import Key  # Import Key for GSI queries
 dynamodb = boto3.resource('dynamodb')
 table = dynamodb.Table(os.environ['DYNAMODB_TABLE'])
 
-
 def lambda_handler(event, context):
     try:
-        print(f"Received event: {json.dumps(event, indent=2)}")  # Log full event for debugging
+        print(f"Received event: {json.dumps(event, indent=2)}") # Log full event for debugging
 
         # Ensure 'body' exists and is a string
         if 'body' not in event or not event['body']:
@@ -22,7 +21,7 @@ def lambda_handler(event, context):
             }
 
         raw_body = event['body']
-        print(f"Raw body received: {raw_body}")  # Debug log the body
+        print(f"Raw body received: {raw_body}") # Debug log the body
 
         # Handle Slack's form-encoded payload or raw JSON from AWS CLI
         if isinstance(raw_body, str):
@@ -38,7 +37,7 @@ def lambda_handler(event, context):
             else:
                 payload = json.loads(raw_body)
         else:
-            payload = raw_body  # If AWS CLI sends a parsed JSON object, use it directly
+            payload = raw_body
 
         print(f"Parsed payload: {json.dumps(payload, indent=2)}")
 
@@ -60,7 +59,10 @@ def lambda_handler(event, context):
             user = payload['user_id']
         else:
             print("Warning: Could not find user information in payload.")
-            user = 'unknown_user'  # Provide a default value
+            user = 'unknown_user' # Provide a default value
+
+        # Get the username if available
+        user_name = payload['user'].get('name', user) if 'user' in payload else user
 
         print(f"Incident ID: {incident_id}, User: {user}")
 
@@ -69,6 +71,7 @@ def lambda_handler(event, context):
             IndexName="incident_id-index",
             KeyConditionExpression=Key("incident_id").eq(incident_id)
         )
+
         items = response.get('Items', [])
         if not items:
             print("No matching incident found")
@@ -79,7 +82,7 @@ def lambda_handler(event, context):
         table.update_item(
             Key={
                 'service_name': item['service_name'],
-                'timestamp': item['timestamp']  # Must include both partition and sort keys
+                'timestamp': item['timestamp'] # Must include both partition and sort keys
             },
             UpdateExpression="SET acknowledged_by = :user, acknowledged_at = :time",
             ExpressionAttributeValues={
@@ -88,9 +91,13 @@ def lambda_handler(event, context):
             }
         )
 
+        # Call acknowledge_incident from main.py to store username
+        from main import acknowledge_incident
+        acknowledge_incident(incident_id, user, user_name)
+
         return {
             'statusCode': 200,
-            'body': json.dumps({'message': f'Incident acknowledged by {user} successfully'})
+            'body': json.dumps({'message': f'Incident acknowledged by {user_name} successfully'})
         }
 
     except Exception as e:

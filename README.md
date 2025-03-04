@@ -1,8 +1,21 @@
 # GitHub Status Monitoring Solution
+A solution for monitoring GitHub's service status, providing outage notifications and incident management through Slack, with high availability across multiple AWS regions.
 
 ## Overview
 
 This solution monitors GitHub's service status (Git Operations and API Requests) and sends notifications to Slack when outages occur. It includes an acknowledgment mechanism and escalation policy.
+
+
+### Solution Components
+1. **Outage Notification**
+   - Monitors GitHub service status
+   - Sends alerts to Slack channel
+   - Includes incident details and acknowledgment button
+
+2. **Incident Acknowledgment**
+   - Interactive Slack buttons for immediate acknowledgment
+   - Records who acknowledged the incident
+   - Updates incident status in real-time
 
 ## Prerequisites
 
@@ -11,6 +24,12 @@ This solution monitors GitHub's service status (Git Operations and API Requests)
 -   Python 3.8+
 -   Slack workspace with webhook configured
 -   StatusCake account (free tier)
+
+### High Availability Architecture
+- Multi-region deployment of Lambda functions (us-east-1 primary, us-west-2 secondary)
+- API Gateway with failover using HTTP API v1
+- DynamoDB with cross-region replication
+- Automatic failover through API Gateway if primary region is unavailable
 
 ## Getting Started
 
@@ -33,7 +52,7 @@ cd cyberark-github-status-monitor
 8.  Copy the webhook URL - this will be used in your Terraform configuration
 9.  **Important Note**: After initial installation, you'll only see a "Reinstall to Workspace" option for adding additional webhooks. When you use this option, the newest webhook will appear at the bottom of the list, even though they all show the same creation date. Always use the webhook URL at the bottom of the list as it's the most recently created one.
 
-### 3. StatusCake Setup (Backup Monitoring)
+### 3. StatusCake Setup (Backup Monitoring) - Not implimented - but can be added via terraform to have another layer of HA
 
 1.  Create a StatusCake Account:
 
@@ -150,6 +169,18 @@ cd cyberark-github-status-monitor
     -   Update `terraform/variables.tf` with appropriate default values
     -   Sensitive values will be pulled from GitHub Secrets during deployment
 
+## Testing the Solution
+
+### API Gateway Acknowledgment Endpoint
+The acknowledgment endpoint is available through API Gateway. The URL can be found in terraform outputs:
+```bash
+terraform output acknowledgment_api_gateway_url
+curl -X POST "$(terraform output -raw acknowledgment_api_gateway_url)" \
+  -H "Content-Type: application/json" \
+  -d '{"incident_id": "test-incident-123", "user": {"id": "U123", "name": "testuser"}}'
+```
+
+
 ### 6. Infrastructure Deployment
 
 1.  Initialize Terraform:
@@ -174,9 +205,17 @@ cd cyberark-github-status-monitor
     -   Lambda functions in two AWS regions
     -   DynamoDB Global Tables for state tracking
     -   API Gateway for Slack interactions
-    -   CloudWatch Events for scheduled monitoring
-    -   StatusCake integration via the Terraform provider
+    -   StatusCake integration via the Terraform provider - not implimentefd
+```markdown
+### CI/CD Pipeline
+The solution includes a GitHub Actions workflow for automated deployments:
+- Automated testing
+- Terraform validation
+- Infrastructure deployment
+- Multi-environment support (dev/prod)
 
+For details, see [.github/workflows/terraform.yml](.github/workflows/terraform.yml)
+```
 ### 7. Testing
 
 1.  Use the provided test script to simulate a GitHub outage:
