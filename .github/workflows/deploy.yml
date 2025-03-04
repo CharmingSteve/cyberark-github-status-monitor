@@ -36,9 +36,10 @@ jobs:
         run: |
           cd terraform
           terraform validate
-    
+
       - name: Terraform Apply
-        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        # the if statement will only run the job if the push is to the main branch or if the workflow_dispatch event is triggered, for company workflows you can use this to control the pipeline
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push' || github.event_name == 'workflow_dispatch'
         run: |
           cd terraform
           terraform apply -auto-approve \
@@ -47,4 +48,3 @@ jobs:
         env:
           SLACK_API_TOKEN: ${{ secrets.SLACK_API_TOKEN }}
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-    
