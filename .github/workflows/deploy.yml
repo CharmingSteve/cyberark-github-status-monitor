@@ -1,60 +1,64 @@
-name: Deploy Infrastructure
+name: 'Deploy Infrastructure'
 
 on:
-  workflow_dispatch:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+env:
+  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+  AWS_REGION: 'us-east-1'
 
 jobs:
-  deploy:
+  terraform:
+    name: 'Terraform'
     runs-on: ubuntu-latest
 
+    defaults:
+      run:
+        shell: bash
+
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
+    - name: Checkout
+      uses: actions/checkout@v3
 
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v2
-        with:
-          terraform_version: 1..0
-          cli_config_migrate: true
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v2
+      with:
+        terraform_version: 1.5.7
 
-      - name: Verify Terraform Version
-        run: terraform version
+    - name: Terraform Format
+      run: |
+        cd terraform
+        terraform fmt -check
 
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v1
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: us-east-1
+    - name: Terraform Init
+      run: |
+        cd terraform
+        terraform init
 
-      - name: Terraform Init
-        run: |
-          cd terraform
-          terraform init
+    - name: Terraform Validate
+      run: |
+        cd terraform
+        terraform validate -no-color
 
-      - name: Terraform Validate
-        run: |
-          cd terraform
-          terraform validate
+    - name: Terraform Plan
+      run: |
+        cd terraform
+        terraform plan -out=tfplan -var="slack_api_token=${{ secrets.SLACK_API_TOKEN }}" -var="slack_webhook_url=${{ secrets.SLACK_WEBHOOK_URL }}"
+      env:
+        SLACK_API_TOKEN: ${{ secrets.SLACK_API_TOKEN }}
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
-      - name: Terraform Apply
-        if: github.ref == 'refs/heads/main'
-        run: |
-          cd terraform
-          terraform apply -auto-approve tfplan \
-          -var="slack_api_token=${{ secrets.SLACK_API_TOKEN }}" \
-          -var="slack_webhook_url=${{ secrets.SLACK_WEBHOOK_URL }}"
-
-      - name: Save Terraform Plan Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: terraform-plan
-          path: terraform/tfplan
-
-      - name: Terraform Apply
-        if: github.ref == 'refs/heads/main'
-        run: |
-          cd terraform
-          terraform apply -auto-approve tfplan \
-            -var="slack_api_token=${{ secrets.SLACK_API_TOKEN }}" \
-            -var="slack_webhook_url=${{ secrets.SLACK_WEBHOOK_URL }}"
+    - name: Terraform Apply
+      if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+      run: |
+        cd terraform
+        terraform apply -auto-approve tfplan
+      env:
+        SLACK_API_TOKEN: ${{ secrets.SLACK_API_TOKEN }}
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
