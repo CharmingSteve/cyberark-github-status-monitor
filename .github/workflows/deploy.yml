@@ -41,9 +41,9 @@ jobs:
         run: |
           cd terraform
           terraform plan -out=tfplan -var="slack_api_token=${{ secrets.SLACK_API_TOKEN }}" -var="slack_webhook_url=${{ secrets.SLACK_WEBHOOK_URL }}"
-          env:
-            SLACK_API_TOKEN: ${{ secrets.SLACK_API_TOKEN }}
-            SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        env:
+          SLACK_API_TOKEN: ${{ secrets.SLACK_API_TOKEN }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
     
       - name: Terraform Apply
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
