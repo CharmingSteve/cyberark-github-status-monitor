@@ -3,8 +3,9 @@ A solution for monitoring GitHub's service status, providing outage notification
 
 ## Overview
 
-This solution monitors GitHub's service status (Git Operations and API Requests) and sends notifications to Slack when outages occur. It includes an acknowledgment mechanism and escalation policy.
+This solution monitors GitHub's service status (Git Operations and API Requests) and sends notifications to Slack when outages occur. It includes an acknowledgment mechanism.
 
+![alt text](image.png)
 
 ### Solution Components
 1. **Outage Notification**
@@ -164,37 +165,45 @@ cd cyberark-github-status-monitor
         -   `SLACK_API_TOKEN`: Your Bot User OAuth Token (starts with `xoxb-`)
         -   `SLACK_WEBHOOK_URL`: Your Slack webhook URL
         -   `STATUSCAKE_API_KEY`: Your StatusCake API key
+
 2.  Terraform Variables:
 
     -   Update `terraform/variables.tf` with appropriate default values
     -   Sensitive values will be pulled from GitHub Secrets during deployment
 
-## Testing the Solution
+### Github Actions CI/CD Pipeline
 
-### API Gateway Acknowledgment Endpoint
-The acknowledgment endpoint is available through API Gateway. The URL can be found in terraform outputs:
-```bash
-terraform output acknowledgment_api_gateway_url
-curl -X POST "$(terraform output -raw acknowledgment_api_gateway_url)" \
-  -H "Content-Type: application/json" \
-  -d '{"incident_id": "test-incident-123", "user": {"id": "U123", "name": "testuser"}}'
-```
+The solution includes a GitHub Actions workflow for automated deployments:
+- Terraform validation
+- Infrastructure deployment
+
+For details, see [.github/workflows/terraform.yml](.github/workflows/terraform.yml)
 
 
-### 6. Infrastructure Deployment
 
-1.  Initialize Terraform:
+
+
+### 6. Infrastructure Deployment - You can also run the pipeline from you local laptop with terraform
+1.  To run from GitHub Actions, make sure to have AWS CLI setup with credentials that can do everything. Set env vars that you otherwise would put as pipeline secrets:
+
+    ```bash
+    export TF_VAR_slack_api_token="YOURSECRETTOKEN"
+    export TF_VAR_slack_webhook_url="https://hooks.slack.com/services/THEWHOLESECRETLINK"
+    ```
+
+
+2.  to run from your laptop - Initialize Terraform:
 
     ```bash
     cd terraform
     terraform init
     ```
-2.  Review the deployment plan:
+3.  Review the deployment plan:
 
     ```bash
     terraform plan
     ```
-3.  Apply the configuration:
+4.  Apply the configuration:
 
     ```bash
     terraform apply
@@ -206,26 +215,17 @@ curl -X POST "$(terraform output -raw acknowledgment_api_gateway_url)" \
     -   DynamoDB Global Tables for state tracking
     -   API Gateway for Slack interactions
     -   StatusCake integration via the Terraform provider - not implimentefd
-```markdown
-### CI/CD Pipeline
-The solution includes a GitHub Actions workflow for automated deployments:
-- Automated testing
-- Terraform validation
-- Infrastructure deployment
-- Multi-environment support (dev/prod)
 
-For details, see [.github/workflows/terraform.yml](.github/workflows/terraform.yml)
+### 7. Testing the Solution
+
+### API Gateway Acknowledgment Endpoint
+The acknowledgment endpoint is available through API Gateway. The URL can be found in terraform outputs:
+```bash
+terraform output acknowledgment_api_gateway_url
+curl -X POST "$(terraform output -raw acknowledgment_api_gateway_url)" \
+  -H "Content-Type: application/json" \
+  -d '{"incident_id": "test-incident-123", "user": {"id": "U123", "name": "testuser"}}'
 ```
-### 7. Testing
-
-1.  Use the provided test script to simulate a GitHub outage:
-
-    ```bash
-    ./scripts/test.sh
-    ```
-2.  Verify that notifications appear in your Slack channel
-3.  Test the acknowledgment mechanism by clicking the "I'm handling this" button
-4.  Test the StatusCake backup by temporarily disabling the AWS Lambda functions
 
 ## Architecture
 
